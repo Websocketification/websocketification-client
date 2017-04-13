@@ -8,7 +8,7 @@ if ('undefined' === typeof(window) && !global.WebSocket) {
 	global.WebSocket = require('ws');
 }
 
-const WebsocketificationClient = require('./../WebsocketificationClient');
+const WebsocketificationClient = require('./../');
 const client = new WebsocketificationClient('ws://127.0.0.1:3123/');
 client.connect();
 const fetch = client.fetch;

@@ -4,4 +4,4 @@
 
 'use strict';
 
-module.exports = require('./WebsocketificationClient');
+module.exports = require('./src/WebsocketificationClient');
