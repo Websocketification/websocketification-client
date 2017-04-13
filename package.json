@@ -19,6 +19,11 @@
   "bugs": {
     "url": "https://github.com/Websocketification/websocketification-client/issues"
   },
+  "files": [
+    "index.js",
+    "README.md",
+    "src/"
+  ],
   "homepage": "https://github.com/Websocketification/websocketification-client#readme",
   "devDependencies": {
     "ws": "^2.2.3"
