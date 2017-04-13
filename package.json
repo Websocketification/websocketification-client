@@ -1,0 +1,26 @@
+{
+  "name": "websocketification-client",
+  "version": "0.8.0",
+  "description": "Websocketification client.",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Websocketification/websocketification-client.git"
+  },
+  "author": "Fisher",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Websocketification/websocketification-client/issues"
+  },
+  "homepage": "https://github.com/Websocketification/websocketification-client#readme",
+  "devDependencies": {
+    "ws": "^2.2.3"
+  }
+}
