@@ -41,6 +41,14 @@ return fetch('/users', options).then(
 }).catch(error => {
 	console.error('Failed to get users: ', error);
 });
+
+/**
+ * Add on broadcast listener.
+ */
+client.setOnBroadcastListener('app.messages', (error, message) => {
+	if (error) {return console.error(error);}
+	console.log(message);
+});
 ```
 
 ## Server/NodeJs Side Usage

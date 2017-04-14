@@ -20,7 +20,7 @@ let options = {
 	body: {name: 'Tom'}
 };
 
-return fetch('/users', options).then(
+fetch('/users', options).then(
 	response => response.json()
 ).then(response => {
 	console.log('Got users: ', response);
@@ -28,4 +28,11 @@ return fetch('/users', options).then(
 	console.error('Failed to get users: ', error);
 });
 
+/**
+ * Add on broadcast listener.
+ */
+client.setOnBroadcastListener('app.messages', (error, message) => {
+	if (error) {return console.error(error);}
+	console.log(message);
+});
 
