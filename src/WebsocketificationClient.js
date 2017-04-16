@@ -12,7 +12,7 @@ const WS_STATUS_ERROR = 'ERROR';
 const METHOD_BROADCAST = '$BROADCAST';
 const METHOD_DEFAULT = 'GET';
 
-const getID = (method = METHOD_DEFAULT, path) => `${METHOD_BROADCAST}:${path}`;
+const getRequestID = (method = METHOD_DEFAULT, path) => `${method}:${path}`;
 
 class WebsocketificationClient {
 	constructor(address) {
@@ -76,7 +76,7 @@ class WebsocketificationClient {
 	onResponse(response) {
 		if (!response || !response.method || !response.status) {return;}
 		response.json = () => response.body;
-		const key = getID(response.method, response.path);
+		const key = getRequestID(response.method, response.path);
 		let listener = this.mTempListeners[key];
 		if (listener) {
 			delete this.mTempListeners[key];
@@ -125,7 +125,7 @@ class WebsocketificationClient {
 					case WS_STATUS_CONNECTED:
 						this.mWS.send(JSON.stringify(options));
 						// Set listener.
-						this.mTempListeners[getID(options.method, options.path)] = {resolve, reject};
+						this.mTempListeners[getRequestID(options.method, options.path)] = {resolve, reject};
 						break;
 					case WS_STATUS_DISCONNECTED:
 					case WS_STATUS_ERROR:
@@ -144,7 +144,7 @@ class WebsocketificationClient {
 	 * @param callback{Function} Callback.
 	 */
 	setOnBroadcastListener(id, callback) {
-		this.mGlobalListeners[getID(METHOD_BROADCAST, id)] = callback;
+		this.mGlobalListeners[getRequestID(METHOD_BROADCAST, id)] = callback;
 	}
 
 	/**
