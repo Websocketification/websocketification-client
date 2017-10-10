@@ -9,10 +9,7 @@ const WS_STATUS_CONNECTED = 'CONNECTED';
 const WS_STATUS_DISCONNECTED = 'DISCONNECTED';
 const WS_STATUS_ERROR = 'ERROR';
 
-const METHOD_BROADCAST = '$BROADCAST';
 const METHOD_DEFAULT = 'GET';
-
-const getRequestID = (method = METHOD_DEFAULT, path) => `${method}:${path}`;
 
 class WebsocketificationClient {
 	constructor(address) {
@@ -74,12 +71,11 @@ class WebsocketificationClient {
 	 * Handle response.
 	 */
 	onResponse(response) {
-		if (!response || !response.method || !response.status) {return;}
+		if (!response || !response.id || !response.status) {return;}
 		response.json = () => response.body;
-		const key = getRequestID(response.method, response.path);
-		let listener = this.mTempListeners[key];
+		let listener = this.mTempListeners[response.id];
 		if (listener) {
-			delete this.mTempListeners[key];
+			delete this.mTempListeners[response.id];
 			if (200 === response.status) {
 				listener.resolve(response);
 			} else {
@@ -87,7 +83,7 @@ class WebsocketificationClient {
 			}
 			return;
 		}
-		listener = this.mGlobalListeners[key];
+		listener = this.mGlobalListeners[response.id];
 		if (listener) {
 			if (200 === response.status) {
 				listener(null, response);
@@ -110,6 +106,7 @@ class WebsocketificationClient {
 	 */
 	fetch(path, options = {}) {
 		options.path = path;
+		options.id = `http$${Math.random()}@${+new Date()}`;
 		if (!options.method) {options.method = METHOD_DEFAULT;}
 		return new Promise((resolve, reject) => {
 			let time = 100;
@@ -125,7 +122,7 @@ class WebsocketificationClient {
 					case WS_STATUS_CONNECTED:
 						this.mWS.send(JSON.stringify(options));
 						// Set listener.
-						this.mTempListeners[getRequestID(options.method, options.path)] = {resolve, reject};
+						this.mTempListeners[options.id] = {resolve, reject};
 						break;
 					case WS_STATUS_DISCONNECTED:
 					case WS_STATUS_ERROR:
@@ -140,11 +137,11 @@ class WebsocketificationClient {
 	/**
 	 * Set on broadcast listener.
 	 *
-	 * @param id{String} Broadcast id
+	 * @param id{String} Broadcast id, which is usually a path.
 	 * @param callback{Function} Callback.
 	 */
 	setOnBroadcastListener(id, callback) {
-		this.mGlobalListeners[getRequestID(METHOD_BROADCAST, id)] = callback;
+		this.mGlobalListeners[id] = callback;
 	}
 
 	/**
