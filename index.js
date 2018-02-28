@@ -1,3 +1,3 @@
 'use strict';
 
-module.exports = require('./src/WebsocketificationClient');
+module.exports = require('./dist/WebsocketificationClient');
