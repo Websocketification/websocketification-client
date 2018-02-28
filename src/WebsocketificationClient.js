@@ -1,7 +1,3 @@
-/**
- * Created by fisher at 7:05 PM on 3/23/17.
- */
-
 'use strict';
 
 const WS_STATUS_CONNECTING = 'CONNECTING';
