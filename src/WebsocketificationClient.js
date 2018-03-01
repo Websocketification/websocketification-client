@@ -10,11 +10,18 @@ const WS_STATUS_CONNECTED = 'CONNECTED'; // = WebSocket.OPEN
 const WS_STATUS_DISCONNECTED = 'DISCONNECTED'; // = WebSocket.CLOSING || WebSocket.CLOSED
 const WS_STATUS_ERROR = 'ERROR'; // = WebSocket.CLOSING || WebSocket.CLOSED
 
+// Defined commands.
+const CMD_PREFIX = '$';
+const CMD_PING = '$PING';
+const CMD_PONG = '$PING';
+
 const METHOD_DEFAULT = 'GET';
 
 class WebsocketificationClient {
 	constructor(address, options = {
 		enableLogging: true,
+		// Heartbeat interval in milliseconds, default: send '$PING' every 50 seconds.
+		heartbeatInterval: 50000,
 		retryWaitingTimeStart: 0,
 		retryWaitingTimeStep: 150,
 	}) {
@@ -49,6 +56,9 @@ class WebsocketificationClient {
 			this.mOnClose = null;
 		}
 
+		// Configure for heartbeat package.
+		this.mHeartbeatInterval = options.heartbeatInterval;
+
 		// Waiting time for retry.
 		this.mRetryWaitingTimeStart = options.retryWaitingTimeStart;
 		this.mRetryWaitingTimeStep = options.retryWaitingTimeStep;
@@ -77,6 +87,17 @@ class WebsocketificationClient {
 			// The corresponding status of mWS which has more status than mWS.readyState.
 			this.mStatus = WS_STATUS_CONNECTING;
 			ws.onmessage = (message) => {
+				// Skip if any internal command is received.
+				if (message.data.startsWith(CMD_PREFIX)) {
+					switch (message.data) {
+						case CMD_PING:
+							ws.send(CMD_PONG);
+							break;
+						case CMD_PONG:
+							break;
+					}
+					return;
+				}
 				const response = Response.NewInstance(message.data);
 				if (!response) {
 					this.log('Unexpected response data:', message.data);
@@ -91,6 +112,15 @@ class WebsocketificationClient {
 			ws.onopen = (event) => {
 				this.mStatus = WS_STATUS_CONNECTED;
 				this.log(`Connected to ${ws.url}.`);
+
+				// Ping in intervals.
+				setTimeout(() => {
+					if (this.mStatus === WS_STATUS_CONNECTED) {
+						ws.send(CMD_PING);
+					}
+				}, this.mHeartbeatInterval);
+
+				// Reset the retry waiting time.
 				this.mRetryWaitingTime = this.mRetryWaitingTimeStart;
 				resolve(event);
 			};
