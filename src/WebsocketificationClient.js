@@ -15,6 +15,8 @@ const CMD_PREFIX = '$';
 const CMD_PING = '$PING';
 const CMD_PONG = '$PING';
 
+const JSON_OBJECT_PREFIX = '{';
+
 const METHOD_DEFAULT = 'GET';
 
 class WebsocketificationClient {
@@ -96,6 +98,10 @@ class WebsocketificationClient {
 						case CMD_PONG:
 							break;
 					}
+					return;
+				}
+				// Skip if, obviously, not an json object is received.
+				if (!message.data.startsWith(JSON_OBJECT_PREFIX)) {
 					return;
 				}
 				const response = Response.NewInstance(message.data);
