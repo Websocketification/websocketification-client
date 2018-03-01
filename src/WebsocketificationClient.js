@@ -120,11 +120,15 @@ class WebsocketificationClient {
 				this.log(`Connected to ${ws.url}.`);
 
 				// Ping in intervals.
-				setTimeout(() => {
-					if (this.mStatus === WS_STATUS_CONNECTED) {
-						ws.send(CMD_PING);
-					}
-				}, this.mHeartbeatInterval);
+				const pingLoop = () => {
+					setTimeout(() => {
+						if (this.mStatus === WS_STATUS_CONNECTED) {
+							ws.send(CMD_PING);
+							pingLoop();
+						}
+					}, this.mHeartbeatInterval);
+				};
+				pingLoop();
 
 				// Reset the retry waiting time.
 				this.mRetryWaitingTime = this.mRetryWaitingTimeStart;
