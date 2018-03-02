@@ -136,6 +136,7 @@ class WebsocketificationClient {
 				if (event.wasClean) {
 					// Connection is elegantly closed.
 					this.mIsNicelyClosed = true;
+					this.log(`WebSocket disconnected nicely, by client or server.`);
 				} else {
 					this.mIsNicelyClosed = false;
 					this.autoConnectOnAbnormalClose();
@@ -164,7 +165,7 @@ class WebsocketificationClient {
 	// Reconnect called on abnormal close,
 	autoConnectOnAbnormalClose() {
 		if (this.mRetryWaitingTime + this.mRetryWaitingTimeStep <= 0) {return;}
-		this.log(`WebSocket closed and waiting for ${this.mRetryWaitingTime} milliseconds before start a new connection.`);
+		this.log(`WebSocket disconnected abnormally and waiting for ${this.mRetryWaitingTime} milliseconds before start a new connection.`);
 		// Retry connection.
 		setTimeout(() => {
 			this.connect();
@@ -184,8 +185,8 @@ class WebsocketificationClient {
 	/**
 	 * Close connection.
 	 */
-	close() {
-		this.mWS.close();
+	close(code = 1000, reason) {
+		this.mWS.close(code, reason);
 	}
 
 	/**
