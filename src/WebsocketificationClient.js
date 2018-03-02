@@ -5,11 +5,6 @@
 
 const Response = require('./Response');
 
-const WS_STATUS_CONNECTING = 'CONNECTING'; // = WebSocket.CONNECTING
-const WS_STATUS_CONNECTED = 'CONNECTED'; // = WebSocket.OPEN
-const WS_STATUS_DISCONNECTED = 'DISCONNECTED'; // = WebSocket.CLOSING || WebSocket.CLOSED
-const WS_STATUS_ERROR = 'ERROR'; // = WebSocket.CLOSING || WebSocket.CLOSED
-
 // Defined commands.
 const CMD_PREFIX = '$';
 const CMD_PING = '$PING';
@@ -35,8 +30,8 @@ class WebsocketificationClient {
 			'setOnClosedListener', 'setOnErrorListener'
 		].map(method => this[method] = this[method].bind(this));
 		this.fetch = this.fetch.bind(this);
-		// The initial status is disconnected.
-		this.mStatus = WS_STATUS_DISCONNECTED;
+		// Whether the socket is closed nicely, if the socket is closed or closing.
+		this.mIsNicelyClosed = true;
 		this.mAddress = address;
 		/**
 		 * Temp listener that will be triggered only for once.
@@ -86,8 +81,6 @@ class WebsocketificationClient {
 			}
 			const ws = this.mWS;
 			this.log(`Connecting to ${ws.url}.`);
-			// The corresponding status of mWS which has more status than mWS.readyState.
-			this.mStatus = WS_STATUS_CONNECTING;
 			ws.onmessage = (message) => {
 				// Skip if any internal command is received.
 				if (message.data.startsWith(CMD_PREFIX)) {
@@ -116,13 +109,12 @@ class WebsocketificationClient {
 				this.onResponse(response);
 			};
 			ws.onopen = (event) => {
-				this.mStatus = WS_STATUS_CONNECTED;
 				this.log(`Connected to ${ws.url}.`);
 
 				// Ping in intervals.
 				const pingLoop = () => {
 					setTimeout(() => {
-						if (this.mStatus === WS_STATUS_CONNECTED) {
+						if (ws.readyState === WebSocket.OPEN) {
 							ws.send(CMD_PING);
 							pingLoop();
 						}
@@ -143,9 +135,9 @@ class WebsocketificationClient {
 			ws.onclose = (event) => {
 				if (event.wasClean) {
 					// Connection is elegantly closed.
-					this.mStatus = WS_STATUS_DISCONNECTED;
+					this.mIsNicelyClosed = true;
 				} else {
-					this.mStatus = WS_STATUS_ERROR;
+					this.mIsNicelyClosed = false;
 					this.log(`WebSocket closed and waiting for ${this.mRetryWaitingTime} milliseconds before start a new connection.`);
 					// Retry connection.
 					setTimeout(() => {
@@ -212,35 +204,38 @@ class WebsocketificationClient {
 		return new Promise((resolve, reject) => {
 			let time = this.mRequestWaitingTimeStart;
 			let checkConnection = () => {
-				switch (this.mStatus) {
-					case WS_STATUS_CONNECTING:
+				switch (this.mWS.readyState) {
+					case WebSocket.CONNECTING:
 						setTimeout(() => {
 							checkConnection();
 						}, time);
 						// Slow down the loop.
 						time += this.mRequestWaitingTimeStep;
 						break;
-					case WS_STATUS_CONNECTED:
+					case WebSocket.OPEN:
 						this.mWS.send(JSON.stringify(options));
 						// Set listener.
 						this.mTempListeners[options.id] = {resolve, reject};
 						break;
-					case WS_STATUS_DISCONNECTED:
-						// Reactive websocket.
-						this.connect().then(() => {
-							if (this.mStatus !== WS_STATUS_CONNECTED) {
-								// This is not going to happen.
-								throw new Error('WebSocket ' + this.mStatus);
-							}
-							this.mWS.send(JSON.stringify(options));
-							// Set listener.
-							this.mTempListeners[options.id] = {resolve, reject};
-						}).catch((ex) => {
-							reject(ex);
-						});
-						break;
-					case WS_STATUS_ERROR:
-						reject(new Error('WebSocket ' + this.mStatus));
+					case WebSocket.CLOSING:
+					case WebSocket.CLOSED:
+						if (this.mIsNicelyClosed) {
+							// Reconnect now if the WebSocket is closed normally.
+							this.connect().then(() => {
+								if (this.mWS.readyState !== WebSocket.OPEN) {
+									// This is not going to happen.
+									throw new Error('WebSocket should be open: ' + WebSocket.readyState);
+								}
+								this.mWS.send(JSON.stringify(options));
+								// Set listener.
+								this.mTempListeners[options.id] = {resolve, reject};
+							}).catch((ex) => {
+								reject(ex);
+							});
+						} else {
+							// Reject error immediately if the WebSocket is closed abnormally.
+							reject(new Error('WebSocket is closed abnormally and is trying to reconnect:' + this.mWS.readyState));
+						}
 						break;
 				}
 			};
