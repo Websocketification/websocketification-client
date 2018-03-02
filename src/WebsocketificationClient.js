@@ -8,7 +8,7 @@ const Response = require('./Response');
 // Defined commands.
 const CMD_PREFIX = '$';
 const CMD_PING = '$PING';
-const CMD_PONG = '$PING';
+const CMD_PONG = '$PONG';
 
 const JSON_OBJECT_PREFIX = '{';
 
@@ -20,7 +20,10 @@ class WebsocketificationClient {
 		// Heartbeat interval in milliseconds, default: send '$PING' every 50 seconds.
 		heartbeatInterval: 50000,
 		retryWaitingTimeStart: 0,
-		retryWaitingTimeStep: 150,
+		retryWaitingTimeStep: 230,
+		// Disconnect after milliseconds with no activities.
+		// Default value is 35 minutes, and set to 0 to disable auto disconnection.
+		autoDisconnectAfter: 35 * 60000,
 	}) {
 		[
 			'connect', 'close',
@@ -60,6 +63,11 @@ class WebsocketificationClient {
 		this.mRetryWaitingTimeStart = options.retryWaitingTimeStart;
 		this.mRetryWaitingTimeStep = options.retryWaitingTimeStep;
 		this.mRetryWaitingTime = this.mRetryWaitingTimeStart;
+
+		// Auto disconnection policy.
+		this.mAutoDisconnectAfter = options.autoDisconnectAfter;
+		this.mAutoDisconnectionTimeoutHandler = null;
+
 		// Waiting time for CONNECTING => CONNECTED.
 		this.mRequestWaitingTimeStart = 100;
 		this.mRequestWaitingTimeStep = 20;
@@ -122,6 +130,8 @@ class WebsocketificationClient {
 				};
 				pingLoop();
 
+				this.resetDisconnectionTimeout();
+
 				// Reset the retry waiting time.
 				this.mRetryWaitingTime = this.mRetryWaitingTimeStart;
 				resolve(event);
@@ -151,6 +161,15 @@ class WebsocketificationClient {
 				reject(event);
 			};
 		})
+	}
+
+	// Update auto disconnection timeout handler, will be called every time when after ws.onopen(), and before ws.send().
+	resetDisconnectionTimeout() {
+		if (this.mAutoDisconnectAfter <= 0) {return;}
+		if (this.mAutoDisconnectionTimeoutHandler) {clearTimeout(this.mAutoDisconnectionTimeoutHandler)}
+		this.mAutoDisconnectionTimeoutHandler = setTimeout(() => {
+			if (this.mWS.readyState === WebSocket.OPEN) {this.mWS.close(1000);}
+		}, this.mAutoDisconnectAfter);
 	}
 
 	/**
@@ -196,6 +215,7 @@ class WebsocketificationClient {
 	 * @returns {Promise}
 	 */
 	fetch(path, options = {}) {
+		this.resetDisconnectionTimeout();
 		options.path = path;
 		options.id = `http$${Math.random()}@${+new Date()}`;
 		if (!options.method) {
