@@ -90,19 +90,9 @@ class WebsocketificationClient {
 			const ws = this.mWS;
 			this.log(`Connecting to ${ws.url}.`);
 			ws.onmessage = (message) => {
-				// Skip if any internal command is received.
-				if (message.data.startsWith(CMD_PREFIX)) {
-					switch (message.data) {
-						case CMD_PING:
-							ws.send(CMD_PONG);
-							break;
-						case CMD_PONG:
-							break;
-					}
-					return;
-				}
 				// Skip if, obviously, not an json object is received.
 				if (!message.data.startsWith(JSON_OBJECT_PREFIX)) {
+					this.handleNoneRequestMessage(message);
 					return;
 				}
 				const response = Response.NewInstance(message.data);
@@ -148,12 +138,7 @@ class WebsocketificationClient {
 					this.mIsNicelyClosed = true;
 				} else {
 					this.mIsNicelyClosed = false;
-					this.log(`WebSocket closed and waiting for ${this.mRetryWaitingTime} milliseconds before start a new connection.`);
-					// Retry connection.
-					setTimeout(() => {
-						this.connect();
-						this.mRetryWaitingTime += this.mRetryWaitingTimeStep;
-					}, this.mRetryWaitingTime);
+					this.autoConnectOnAbnormalClose();
 				}
 				if (this.mOnClose) {
 					this.mOnClose(event);
@@ -161,6 +146,30 @@ class WebsocketificationClient {
 				reject(event);
 			};
 		})
+	}
+
+	handleNoneRequestMessage(message) {
+		// Skip if any internal command is received.
+		if (message.data.startsWith(CMD_PREFIX)) {
+			switch (message.data) {
+				case CMD_PING:
+					this.mWS.send(CMD_PONG);
+					break;
+				case CMD_PONG:
+					break;
+			}
+		}
+	}
+
+	// Reconnect called on abnormal close,
+	autoConnectOnAbnormalClose() {
+		if (this.mRetryWaitingTime + this.mRetryWaitingTimeStep <= 0) {return;}
+		this.log(`WebSocket closed and waiting for ${this.mRetryWaitingTime} milliseconds before start a new connection.`);
+		// Retry connection.
+		setTimeout(() => {
+			this.connect();
+			this.mRetryWaitingTime += this.mRetryWaitingTimeStep;
+		}, this.mRetryWaitingTime);
 	}
 
 	// Update auto disconnection timeout handler, will be called every time when after ws.onopen(), and before ws.send().
