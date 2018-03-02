@@ -230,49 +230,42 @@ class WebsocketificationClient {
 		this.resetDisconnectionTimeout();
 		options.path = path;
 		options.id = `http$${Math.random()}@${+new Date()}`;
-		if (!options.method) {
-			options.method = METHOD_DEFAULT;
-		}
+		if (!options.method) {options.method = METHOD_DEFAULT;}
 		return new Promise((resolve, reject) => {
-			let time = this.mRequestWaitingTimeStart;
-			let checkConnection = () => {
-				switch (this.mWS.readyState) {
-					case WebSocket.CONNECTING:
-						setTimeout(() => {
-							checkConnection();
-						}, time);
-						// Slow down the loop.
-						time += this.mRequestWaitingTimeStep;
-						break;
-					case WebSocket.OPEN:
-						this.mWS.send(JSON.stringify(options));
-						// Set listener.
-						this.mTempListeners[options.id] = {resolve, reject};
-						break;
-					case WebSocket.CLOSING:
-					case WebSocket.CLOSED:
-						if (this.mIsNicelyClosed) {
-							// Reconnect now if the WebSocket is closed normally.
-							this.connect().then(() => {
-								if (this.mWS.readyState !== WebSocket.OPEN) {
-									// This is not going to happen.
-									throw new Error('WebSocket should be open: ' + WebSocket.readyState);
-								}
-								this.mWS.send(JSON.stringify(options));
-								// Set listener.
-								this.mTempListeners[options.id] = {resolve, reject};
-							}).catch((ex) => {
-								reject(ex);
-							});
-						} else {
-							// Reject error immediately if the WebSocket is closed abnormally.
-							reject(new Error('WebSocket is closed abnormally and is trying to reconnect:' + this.mWS.readyState));
-						}
-						break;
-				}
-			};
-			checkConnection();
+			this.sendRequest(resolve, reject, options, this.mRequestWaitingTimeStart);
 		});
+	}
+
+	sendRequest(resolve, reject, request, waitingTime) {
+		if (this.mWS.readyState === WebSocket.CONNECTING) {
+			setTimeout(() => {
+				this.sendRequest(resolve, reject, request, waitingTime);
+			}, waitingTime);
+			// Slow down the loop.
+			waitingTime += this.mRequestWaitingTimeStep;
+		} else if (this.mWS.readyState === WebSocket.OPEN) {
+			this.mWS.send(JSON.stringify(request));
+			// Set listener.
+			this.mTempListeners[request.id] = {resolve, reject};
+		} else if (this.mWS.readyState === WebSocket.CLOSING || this.mWS.readyState === WebSocket.CLOSED) {
+			if (!this.mIsNicelyClosed) {
+				// Reject error immediately if the WebSocket is closed abnormally.
+				reject(new Error('WebSocket is closed abnormally and is trying to reconnect:' + this.mWS.readyState));
+				return;
+			}
+			// Reconnect now if the WebSocket is closed normally.
+			this.connect().then(() => {
+				if (this.mWS.readyState !== WebSocket.OPEN) {
+					// This is not going to happen.
+					reject(new Error('WebSocket should be open: ' + WebSocket.readyState));
+				}
+				this.mWS.send(JSON.stringify(request));
+				// Set listener.
+				this.mTempListeners[request.id] = {resolve, reject};
+			}).catch((ex) => {
+				reject(ex);
+			});
+		}
 	}
 
 	/**
