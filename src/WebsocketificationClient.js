@@ -58,6 +58,7 @@ class WebsocketificationClient {
 
 		// Configure for heartbeat package.
 		this.mHeartbeatInterval = heartbeatInterval;
+		this.mHeartbeatTimeoutHandler = null;
 
 		// Waiting time for retry.
 		this.mRetryWaitingTimeStart = retryWaitingTimeStart;
@@ -108,20 +109,8 @@ class WebsocketificationClient {
 			};
 			ws.onopen = (event) => {
 				this.log(`Connected to ${ws.url}.`);
-
-				// Ping in intervals.
-				const pingLoop = () => {
-					setTimeout(() => {
-						if (ws.readyState === WebSocket.OPEN) {
-							ws.send(CMD_PING);
-							pingLoop();
-						}
-					}, this.mHeartbeatInterval);
-				};
-				pingLoop();
-
+				this.setupPingLoop();
 				this.resetDisconnectionTimeout();
-
 				// Reset the retry waiting time.
 				this.mRetryWaitingTime = this.mRetryWaitingTimeStart;
 				resolve(event);
@@ -133,20 +122,24 @@ class WebsocketificationClient {
 				reject(event);
 			};
 			ws.onclose = (event) => {
-				if (event.wasClean) {
-					// Connection is elegantly closed.
-					this.mIsNicelyClosed = true;
-					this.log(`WebSocket disconnected nicely, by client or server.`);
-				} else {
-					this.mIsNicelyClosed = false;
-					this.autoConnectOnAbnormalClose();
-				}
+				this.onDisconnected(event);
 				if (this.mOnClose) {
 					this.mOnClose(event);
 				}
 				reject(event);
 			};
 		})
+	}
+
+	setupPingLoop() {
+		if (this.mHeartbeatInterval <= 0) {return;}
+		// Ping in intervals.
+		if (this.mHeartbeatTimeoutHandler) {clearTimeout(this.mHeartbeatTimeoutHandler);}
+		this.mHeartbeatTimeoutHandler = setTimeout(() => {
+			if (this.mWS.readyState !== WebSocket.OPEN) {return;}
+			this.mWS.send(CMD_PING);
+			this.setupPingLoop();
+		}, this.mHeartbeatInterval);
 	}
 
 	handleNoneRequestMessage(message) {
@@ -162,11 +155,20 @@ class WebsocketificationClient {
 		}
 	}
 
-	// Reconnect called on abnormal close,
-	autoConnectOnAbnormalClose() {
-		if (this.mRetryWaitingTime + this.mRetryWaitingTimeStep <= 0) {return;}
-		this.log(`WebSocket disconnected abnormally and waiting for ${this.mRetryWaitingTime} milliseconds before start a new connection.`);
-		// Retry connection.
+	onDisconnected(event) {
+		if (event.wasClean) {
+			// Connection is elegantly closed.
+			this.mIsNicelyClosed = true;
+			this.log(`WebSocket disconnected nicely, by client or server, and auto reconnection will be triggered when any message is needed to be sent.`);
+			return;
+		}
+		this.mIsNicelyClosed = false;
+		if (this.mRetryWaitingTime + this.mRetryWaitingTimeStep <= 0) {
+			this.log('WebSocket disconnected abnormally and no auto reconnection is scheduled due to configuration.');
+			return;
+		}
+		this.log(`WebSocket disconnected abnormally and auto reconnection is scheduled after ${this.mRetryWaitingTime} milliseconds.`);
+		// Schedule an auto reconnection.
 		setTimeout(() => {
 			this.connect();
 			this.mRetryWaitingTime += this.mRetryWaitingTimeStep;
