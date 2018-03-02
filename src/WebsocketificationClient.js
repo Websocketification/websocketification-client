@@ -15,16 +15,16 @@ const JSON_OBJECT_PREFIX = '{';
 const METHOD_DEFAULT = 'GET';
 
 class WebsocketificationClient {
-	constructor(address, options = {
-		enableLogging: true,
+	constructor(address, {
+		enableLogging = true,
 		// Heartbeat interval in milliseconds, default: send '$PING' every 50 seconds.
-		heartbeatInterval: 50000,
-		retryWaitingTimeStart: 0,
-		retryWaitingTimeStep: 230,
+		heartbeatInterval = 50000,
+		retryWaitingTimeStart = 0,
+		retryWaitingTimeStep = 230,
 		// Disconnect after milliseconds with no activities.
 		// Default value is 35 minutes, and set to 0 to disable auto disconnection.
-		autoDisconnectAfter: 35 * 60000,
-	}) {
+		autoDisconnectAfter = 35 * 60000,
+	} = {}) {
 		[
 			'connect', 'close',
 			'onResponse',
@@ -48,7 +48,7 @@ class WebsocketificationClient {
 		 * Unhandled listener that will be called for unhandled response.
 		 */
 		this.mUnhandledListener = undefined;
-		this.mEnableLogging = options.enableLogging;
+		this.mEnableLogging = enableLogging;
 		if (this.mEnableLogging) {
 			// The default WebSocket.onerror event listener.
 			this.mOnError = (event) => console.error('WebSocket onerror callback triggered: ws.onerror(event)->', event);
@@ -57,15 +57,15 @@ class WebsocketificationClient {
 		}
 
 		// Configure for heartbeat package.
-		this.mHeartbeatInterval = options.heartbeatInterval;
+		this.mHeartbeatInterval = heartbeatInterval;
 
 		// Waiting time for retry.
-		this.mRetryWaitingTimeStart = options.retryWaitingTimeStart;
-		this.mRetryWaitingTimeStep = options.retryWaitingTimeStep;
+		this.mRetryWaitingTimeStart = retryWaitingTimeStart;
+		this.mRetryWaitingTimeStep = retryWaitingTimeStep;
 		this.mRetryWaitingTime = this.mRetryWaitingTimeStart;
 
 		// Auto disconnection policy.
-		this.mAutoDisconnectAfter = options.autoDisconnectAfter;
+		this.mAutoDisconnectAfter = autoDisconnectAfter;
 		this.mAutoDisconnectionTimeoutHandler = null;
 
 		// Waiting time for CONNECTING => CONNECTED.
