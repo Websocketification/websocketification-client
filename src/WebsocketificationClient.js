@@ -33,8 +33,11 @@ class WebsocketificationClient {
 			'setOnClosedListener', 'setOnErrorListener'
 		].map(method => this[method] = this[method].bind(this));
 		this.fetch = this.fetch.bind(this);
-		// Whether a reconnection is expected, which will be set true by this.reconnect()
-		this.mIsExpectedToReconnect = false;
+
+		/* Manual Disconnection */
+		this.mIsManualDisconnected = false;
+		this.mManualDisconnectionResolveFunc = null;
+
 		// Whether the socket is closed nicely, if the socket is closed or closing.
 		this.mIsNicelyClosed = true;
 		this.mAddress = address;
@@ -158,11 +161,11 @@ class WebsocketificationClient {
 	}
 
 	onDisconnected(event) {
-		if (this.mIsExpectedToReconnect) {
-			this.mIsExpectedToReconnect = false;
-			this.log(`WebSocket disconnected manually by client and a reconnection is scheduled since this.reconnect() is called!`);
-			this.connect();
-			return;
+		if (this.mIsManualDisconnected && this.mManualDisconnectionResolveFunc) {
+			this.mIsManualDisconnected = false;
+			// Successfully manually disconnected.
+			this.mManualDisconnectionResolveFunc(event);
+			this.mManualDisconnectionResolveFunc = null;
 		}
 		if (event.wasClean) {
 			// Connection is elegantly closed.
@@ -196,14 +199,25 @@ class WebsocketificationClient {
 	 * Close connection.
 	 */
 	close(code = 1000, reason) {
-		this.mWS.close(code, reason);
+		return new Promise((resolve, reject) => {
+			if (this.mWS.readyState === WebSocket.OPEN) {
+				this.mIsManualDisconnected = true;
+				this.mManualDisconnectionResolveFunc = resolve;
+				this.mWS.close(code, reason);
+			} else {
+				reject('The WebSocket is not opening, and hence cannot be close!');
+			}
+		});
 	}
 
 	// Reconnect to the WebSocket server.
 	reconnect(code = 1000) {
-		// Set the flat to schedule a reconnection.
-		this.mIsExpectedToReconnect = true;
-		this.close(code);
+		return new Promise((resolve, reject) => {
+			this.close(code).finally(() => {
+				this.log(`WebSocket disconnected manually by client and a reconnection is scheduled since this.reconnect() is called!`);
+				this.connect().then(resolve).catch(reject);
+			});
+		});
 	}
 
 	/**
