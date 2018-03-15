@@ -34,10 +34,6 @@ class WebsocketificationClient {
 		].map(method => this[method] = this[method].bind(this));
 		this.fetch = this.fetch.bind(this);
 
-		/* Manual Reconnection */
-		// Whether a reconnection is expected, which will be set true by this.reconnect()
-		this.mIsExpectedToReconnect = false;
-
 		/* Manual Disconnection */
 		this.mIsManualDisconnected = false;
 		this.mManualDisconnectionResolveFunc = null;
@@ -171,12 +167,6 @@ class WebsocketificationClient {
 			this.mManualDisconnectionResolveFunc(event);
 			this.mManualDisconnectionResolveFunc = null;
 		}
-		if (this.mIsExpectedToReconnect) {
-			this.mIsExpectedToReconnect = false;
-			this.log(`WebSocket disconnected manually by client and a reconnection is scheduled since this.reconnect() is called!`);
-			this.connect();
-			return;
-		}
 		if (event.wasClean) {
 			// Connection is elegantly closed.
 			this.mIsNicelyClosed = true;
@@ -222,9 +212,12 @@ class WebsocketificationClient {
 
 	// Reconnect to the WebSocket server.
 	reconnect(code = 1000) {
-		// Set the flat to schedule a reconnection.
-		this.mIsExpectedToReconnect = true;
-		this.close(code);
+		return new Promise((resolve, reject) => {
+			this.close(code).finally(() => {
+				this.log(`WebSocket disconnected manually by client and a reconnection is scheduled since this.reconnect() is called!`);
+				this.connect().then(resolve).catch(reject);
+			});
+		});
 	}
 
 	/**
