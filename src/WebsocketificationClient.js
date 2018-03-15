@@ -33,8 +33,15 @@ class WebsocketificationClient {
 			'setOnClosedListener', 'setOnErrorListener'
 		].map(method => this[method] = this[method].bind(this));
 		this.fetch = this.fetch.bind(this);
+
+		/* Manual Reconnection */
 		// Whether a reconnection is expected, which will be set true by this.reconnect()
 		this.mIsExpectedToReconnect = false;
+
+		/* Manual Disconnection */
+		this.mIsManualDisconnected = false;
+		this.mManualDisconnectionResolveFunc = null;
+
 		// Whether the socket is closed nicely, if the socket is closed or closing.
 		this.mIsNicelyClosed = true;
 		this.mAddress = address;
@@ -158,6 +165,12 @@ class WebsocketificationClient {
 	}
 
 	onDisconnected(event) {
+		if (this.mIsManualDisconnected && this.mManualDisconnectionResolveFunc) {
+			this.mIsManualDisconnected = false;
+			// Successfully manually disconnected.
+			this.mManualDisconnectionResolveFunc(event);
+			this.mManualDisconnectionResolveFunc = null;
+		}
 		if (this.mIsExpectedToReconnect) {
 			this.mIsExpectedToReconnect = false;
 			this.log(`WebSocket disconnected manually by client and a reconnection is scheduled since this.reconnect() is called!`);
@@ -196,7 +209,15 @@ class WebsocketificationClient {
 	 * Close connection.
 	 */
 	close(code = 1000, reason) {
-		this.mWS.close(code, reason);
+		return new Promise((resolve, reject) => {
+			if (this.mWS.readyState === WebSocket.OPEN) {
+				this.mIsManualDisconnected = true;
+				this.mManualDisconnectionResolveFunc = resolve;
+				this.mWS.close(code, reason);
+			} else {
+				reject('The WebSocket is not opening, and hence cannot be close!');
+			}
+		});
 	}
 
 	// Reconnect to the WebSocket server.
