@@ -33,6 +33,8 @@ class WebsocketificationClient {
 			'setOnClosedListener', 'setOnErrorListener'
 		].map(method => this[method] = this[method].bind(this));
 		this.fetch = this.fetch.bind(this);
+		// Whether a reconnection is expected, which will be set true by this.reconnect()
+		this.mIsExpectedToReconnect = false;
 		// Whether the socket is closed nicely, if the socket is closed or closing.
 		this.mIsNicelyClosed = true;
 		this.mAddress = address;
@@ -156,6 +158,12 @@ class WebsocketificationClient {
 	}
 
 	onDisconnected(event) {
+		if (this.mIsExpectedToReconnect) {
+			this.mIsExpectedToReconnect = false;
+			this.log(`WebSocket disconnected manually by client and a reconnection is scheduled since this.reconnect() is called!`);
+			this.connect();
+			return;
+		}
 		if (event.wasClean) {
 			// Connection is elegantly closed.
 			this.mIsNicelyClosed = true;
@@ -189,6 +197,13 @@ class WebsocketificationClient {
 	 */
 	close(code = 1000, reason) {
 		this.mWS.close(code, reason);
+	}
+
+	// Reconnect to the WebSocket server.
+	reconnect(code = 1000) {
+		// Set the flat to schedule a reconnection.
+		this.mIsExpectedToReconnect = true;
+		this.close(code);
 	}
 
 	/**
