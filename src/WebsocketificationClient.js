@@ -336,4 +336,7 @@ class WebsocketificationClient {
 	}
 }
 
+// Export the class of Response for external access.
+WebsocketificationClient.Response = Response;
+
 module.exports = WebsocketificationClient;
